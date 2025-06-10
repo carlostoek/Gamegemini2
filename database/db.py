@@ -1,42 +1,27 @@
-# database/db.py
+# el_juego_del_divan/database/db.py
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.orm import declarative_base # Importa declarative_base directamente aquí
+from sqlalchemy.orm import declarative_base
 from contextlib import asynccontextmanager
 from sqlalchemy.future import select
+import asyncio # Necesario si vas a usar asyncio.run() en un if __name__ == "__main__" block
 
-# Asumo que Base.metadata es accesible aquí, si no, lo más fácil es definir Base aquí
-# Si quieres mantener Base en base_model.py, asegúrate de que base_model.py
-# tenga: from sqlalchemy.orm import declarative_base; Base = declarative_base()
-# y que esa Base sea la que todos tus modelos heredan.
-# Por simplicidad y para asegurar que Base se inicialice correctamente para el engine:
-# Define la base declarativa para tus modelos SQLAlchemy aquí mismo si no hay una razón fuerte para que este en otro archivo.
-# Si el_juego_del_divan/database/base_model.py existe y solo contiene 'Base = declarative_base()',
-# podrías considerar mover esa línea aquí para consolidar.
-# Por ahora, mantendremos la importación asumiendo que es correcta.
-from database.base_model import Base # Si base_model.py solo contiene 'Base = declarative_base()'
+from el_juego_del_divan.config.settings import settings
+from el_juego_del_divan.utils.logger import logger
 
-from config.settings import settings
-from utils.logger import logger
+# Define la base declarativa para tus modelos SQLAlchemy.
+# Se mantiene aquí por convención si solo base_model.py contiene 'Base = declarative_base()'.
+# Si prefieres que solo base_model.py contenga la definición, este import es correcto.
+from database.base_model import Base
 
-# IMPORTANTE: Asegúrate de que todos tus modelos sean importados aquí
-# para que Base.metadata.create_all los descubra y cree sus tablas.
-# Los prefijos de importación deben coincidir con tu estructura de paquetes (el_juego_del_divan.database.models).
-# Aquí los he ajustado para que la importación funcione desde db.py dentro de el_juego_del_divan/database/
-from database.models.user import User
-from database.models.level import Level, INITIAL_LEVELS
-from database.models.badge import Badge, INITIAL_BADGES
-from database.models.purchase import Purchase
-from database.models.reward import Reward, INITIAL_REWARDS
-from database.models.mission import Mission # Asegúrate de importar todos tus modelos
-
+# URL de conexión a la base de datos desde tus settings
 DATABASE_URL = settings.DATABASE_URL
 
-# Crear el engine asíncrono
-# *** SOLUCIÓN CLAVE: future=True es fundamental para SQLAlchemy 2.0 y evitar MissingGreenlet ***
-# echo=True es útil para depuración, mostrará las consultas SQL en los logs.
+# Crea el motor de base de datos asíncrono
+# *** CRUCIAL: future=True es esencial para SQLAlchemy 2.0 y el manejo de contextos asíncronos. ***
+# echo=True es útil para depuración, muestra las consultas SQL en los logs.
 async_engine = create_async_engine(DATABASE_URL, echo=True, future=True)
 
-# Usa async_sessionmaker para el manejo asíncrono de sesiones
+# Crea un generador de sesiones asíncronas. Esto reemplaza a 'AsyncSessionLocal'.
 async_session_maker = async_sessionmaker(
     bind=async_engine,
     class_=AsyncSession,
@@ -48,13 +33,24 @@ async_session_maker = async_sessionmaker(
 async def init_db():
     """
     Inicializa la base de datos: crea todas las tablas definidas en Base.
+    Esta función debe ser llamada al inicio del bot (ej. en bot.py o main.py).
     """
     logger.info("Inicializando la base de datos...")
     async with async_engine.begin() as conn:
-        # run_sync es necesario para ejecutar Base.metadata.create_all de forma síncrona
+        # run_sync es necesario para ejecutar operaciones de metadata de forma síncrona
         # dentro de un contexto asíncrono sin bloquear el bucle de eventos.
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Base de datos inicializada correctamente.")
+
+# IMPORTANTE: Asegúrate de que todos tus modelos sean importados aquí
+# para que Base.metadata.create_all los descubra y cree sus tablas.
+# Los prefijos de importación deben coincidir con tu estructura de paquetes.
+from database.models.user import User
+from database.models.level import Level, INITIAL_LEVELS
+from database.models.badge import Badge, INITIAL_BADGES
+from database.models.purchase import Purchase
+from database.models.reward import Reward, INITIAL_REWARDS
+from database.models.mission import Mission # Asegúrate de importar todos tus modelos aquí
 
 async def insert_initial_data(session: AsyncSession):
     """Inserta los niveles, insignias y recompensas iniciales si las tablas están vacías."""
@@ -100,13 +96,9 @@ async def get_db():
     async with async_session_maker() as session:
         yield session
 
-# =========================================================================
-# Considera si necesitas un if __name__ == "__main__": aquí.
-# Si init_db() y insert_initial_data() ya se llaman desde bot.py al iniciar,
-# entonces no necesitas este bloque.
-# =========================================================================
+# Bloque para inicialización/seed si se ejecuta el script directamente.
+# Normalmente, estas funciones se llaman desde bot.py al iniciar.
 # if __name__ == "__main__":
-#     import asyncio
 #     async def _run_init_and_seed():
 #         await init_db()
 #         async with async_session_maker() as session:
