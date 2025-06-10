@@ -3,10 +3,10 @@ from aiogram import Router, types
 from aiogram.filters import Command
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.sql import func # Para usar funciones SQL como func.now()
+from sqlalchemy.sql import func
 
 from database.models.user import User
-from database.models.level import Level # Para cargar el nombre del nivel
+from database.models.level import Level # Asegúrate de que Level esté importado
 from utils.logger import logger
 from config.settings import settings
 
@@ -14,11 +14,7 @@ router = Router()
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message, session: AsyncSession, user: User):
-    """
-    Handler para el comando /start.
-    """
     logger.info(f"Comando /start recibido de usuario: {user.username or user.first_name} (ID: {user.id})")
-
     welcome_message = (
         f"¡Hola, {user.first_name}! 👋\n\n"
         "¡Bienvenido al universo exclusivo de [Nombre de tu Canal/Comunidad]! 🚀\n\n"
@@ -35,11 +31,7 @@ async def cmd_start(message: types.Message, session: AsyncSession, user: User):
 
 @router.message(Command("help"))
 async def cmd_help(message: types.Message, session: AsyncSession, user: User):
-    """
-    Handler para el comando /help.
-    """
     logger.info(f"Comando /help recibido de usuario: {user.username or user.first_name} (ID: {user.id})")
-
     help_message = (
         "Aquí tienes una lista de comandos disponibles:\n\n"
         "📚 **/start** - Inicia el bot y recibe un mensaje de bienvenida.\n"
@@ -59,25 +51,23 @@ async def cmd_status(message: types.Message, session: AsyncSession, user: User):
     """
     logger.info(f"Comando /status recibido de usuario: {user.username or user.first_name} (ID: {user.id})")
 
-    # --- Lógica original COMENTADA TEMPORALMENTE para depuración ---
-    # level_query = await session.execute(
-    #     select(Level).filter_by(id=user.level_id)
-    # )
-    # level = level_query.scalars().first()
-    # level_name = level.name if level else "Desconocido"
-    #
-    # import json
-    # try:
-    #     user_badges = json.loads(user.badges_json) if user.badges_json else []
-    #     badges_list = ", ".join([badge['name'] for badge in user_badges]) if user_badges else "Ninguna"
-    # except json.JSONDecodeError:
-    #     badges_list = "Error al cargar insignias"
-    # --- FIN DE LÓGICA COMENTADA ---
+    # --- REINTRODUCIENDO LÓGICA DE NIVEL ---
+    level_query = await session.execute(
+        select(Level).filter_by(id=user.level_id)
+    )
+    level = level_query.scalars().first()
+    level_name = level.name if level else "Desconocido"
+    # --- FIN DE LÓGICA DE NIVEL REINTRODUCIDA ---
 
-    # Mensaje de prueba simple
+    # El resto de la lógica de insignias y el mensaje de prueba (temporalmente sin insignias)
     status_message = (
-        f"**¡Hola, {user.first_name}!**\n"
-        "Este es un mensaje de prueba para /status. ¡El comando funciona si ves esto!"
+        f"**Estado de {user.first_name}:**\n"
+        f"Nivel: **{level_name}** ({user.points} puntos)\n" # Incluimos el nombre del nivel
+        f"Interacciones hoy: {user.interactions_count}\n"
+        f"Última interacción: {user.last_interaction_at.strftime('%Y-%m-%d %H:%M:%S') if user.last_interaction_at else 'N/A'}\n"
+        f"Últimos puntos diarios: {user.last_daily_points_claim.strftime('%Y-%m-%d %H:%M:%S') if user.last_daily_points_claim else 'Nunca'}\n"
+        f"Es Admin: {'Sí' if user.is_admin else 'No'}\n"
+        "\n*(Las insignias se mostrarán después de la próxima prueba)*"
     )
     await message.answer(status_message)
 
