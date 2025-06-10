@@ -6,9 +6,10 @@ from sqlalchemy.future import select
 from sqlalchemy.sql import func
 
 from database.models.user import User
-from database.models.level import Level # Asegúrate de que Level esté importado
+from database.models.level import Level
 from utils.logger import logger
 from config.settings import settings
+import json # Asegúrate de que json esté importado aquí para las insignias
 
 router = Router()
 
@@ -51,23 +52,34 @@ async def cmd_status(message: types.Message, session: AsyncSession, user: User):
     """
     logger.info(f"Comando /status recibido de usuario: {user.username or user.first_name} (ID: {user.id})")
 
-    # --- REINTRODUCIENDO LÓGICA DE NIVEL ---
+    # Cargar el nombre del nivel
     level_query = await session.execute(
         select(Level).filter_by(id=user.level_id)
     )
     level = level_query.scalars().first()
     level_name = level.name if level else "Desconocido"
-    # --- FIN DE LÓGICA DE NIVEL REINTRODUCIDA ---
 
-    # El resto de la lógica de insignias y el mensaje de prueba (temporalmente sin insignias)
+    # Lógica para las insignias
+    try:
+        # Aseguramos que user.badges_json sea una cadena válida antes de intentar parsearla
+        user_badges_raw = user.badges_json if user.badges_json is not None else "[]"
+        user_badges = json.loads(user_badges_raw)
+        badges_list = ", ".join([badge['name'] for badge in user_badges]) if user_badges else "Ninguna"
+    except json.JSONDecodeError:
+        logger.error(f"Error al decodificar insignias para usuario {user.id}: {user.badges_json}")
+        badges_list = "Error al cargar insignias"
+    except Exception as e:
+        logger.error(f"Error inesperado al procesar insignias para usuario {user.id}: {e}")
+        badges_list = "Error al cargar insignias"
+
     status_message = (
         f"**Estado de {user.first_name}:**\n"
-        f"Nivel: **{level_name}** ({user.points} puntos)\n" # Incluimos el nombre del nivel
+        f"Nivel: **{level_name}** ({user.points} puntos)\n"
+        f"Insignias: {badges_list}\n"
         f"Interacciones hoy: {user.interactions_count}\n"
         f"Última interacción: {user.last_interaction_at.strftime('%Y-%m-%d %H:%M:%S') if user.last_interaction_at else 'N/A'}\n"
         f"Últimos puntos diarios: {user.last_daily_points_claim.strftime('%Y-%m-%d %H:%M:%S') if user.last_daily_points_claim else 'Nunca'}\n"
         f"Es Admin: {'Sí' if user.is_admin else 'No'}\n"
-        "\n*(Las insignias se mostrarán después de la próxima prueba)*"
     )
     await message.answer(status_message)
 
