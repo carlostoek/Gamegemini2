@@ -4,23 +4,22 @@ from sqlalchemy.orm import sessionmaker
 from contextlib import asynccontextmanager
 from sqlalchemy.future import select
 
-# Importar Base desde su nuevo archivo separado
-from database.base_model import Base # <--- CAMBIO IMPORTANTE
+# Importar Base desde su archivo separado (sin cambios)
+from database.base_model import Base
 
 from config.settings import settings
 from utils.logger import logger
 
-# Importar modelos para que Base.metadata.create_all los reconozca
-# ¡IMPORTANTE! Aquí SÍ deben estar todos tus modelos para que las tablas se creen
+# Importar modelos para que Base.metadata.create_all los reconozca (sin cambios)
 from database.models.user import User
 from database.models.level import Level, INITIAL_LEVELS
 from database.models.badge import Badge, INITIAL_BADGES
 from database.models.purchase import Purchase
 from database.models.reward import Reward, INITIAL_REWARDS
 
-DATABASE_URL = settings.DATABASE_URL
+DATABASE_URL = settings.DATABASE_URL # <--- Usa la URL definida en settings.py
 
-# Base ya no se define aquí, se importa
+# Crear el engine asíncrono (sin cambios importantes aquí)
 engine = create_async_engine(DATABASE_URL, echo=False)
 
 AsyncSessionLocal = sessionmaker(
@@ -41,6 +40,8 @@ async def init_db():
 
 async def insert_initial_data(session: AsyncSession):
     """Inserta los niveles, insignias y recompensas iniciales si las tablas están vacías."""
+    # (El resto de esta función es igual, no la he repetido entera para brevedad,
+    # pero usa la versión completa que tienes)
     # Insertar niveles
     result_levels = await session.execute(select(Level))
     if not result_levels.scalars().first():
