@@ -7,7 +7,7 @@ class Reward(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False, unique=True)
-    description = Column(Text, nullable=True)
+    description = Column(Text, nullable=True) # <-- CORREGIDO: nullable=True
     points_cost = Column(Integer, nullable=False)
     is_active = Column(Boolean, default=True) # Si la recompensa está disponible para canjear
 
