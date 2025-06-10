@@ -1,17 +1,15 @@
 # handlers/users/user_commands.py
-from aiogram import Router, types # Importa Router y types de aiogram
-from aiogram.filters import Command # Importa Command para manejar comandos como /start
-from sqlalchemy.ext.asyncio import AsyncSession # Para la sesión de base de datos
-from sqlalchemy.future import select # Para realizar consultas SELECT
+from aiogram import Router, types
+from aiogram.filters import Command
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from sqlalchemy.sql import func # Para usar funciones SQL como func.now()
 
-from database.models.user import User # Importa el modelo User
-from database.models.level import Level # Importa el modelo Level (necesario para /status)
-from utils.logger import logger # Para el logger de la aplicación
-from config.settings import settings # Para acceder a la configuración global, como ADMIN_IDS
+from database.models.user import User
+from database.models.level import Level # Para cargar el nombre del nivel
+from utils.logger import logger
+from config.settings import settings
 
-# Define el router para este conjunto de handlers.
-# Esta línea es CRÍTICA y fue la causa del último error.
 router = Router()
 
 @router.message(Command("start"))
@@ -19,7 +17,6 @@ async def cmd_start(message: types.Message, session: AsyncSession, user: User):
     """
     Handler para el comando /start.
     """
-    # Se asegura de que el log muestre el nombre de usuario si existe, o el primer nombre.
     logger.info(f"Comando /start recibido de usuario: {user.username or user.first_name} (ID: {user.id})")
 
     welcome_message = (
@@ -62,29 +59,25 @@ async def cmd_status(message: types.Message, session: AsyncSession, user: User):
     """
     logger.info(f"Comando /status recibido de usuario: {user.username or user.first_name} (ID: {user.id})")
 
-    # Cargar el nombre del nivel del usuario de la base de datos
-    level_query = await session.execute(
-        select(Level).filter_by(id=user.level_id)
-    )
-    level = level_query.scalars().first()
-    level_name = level.name if level else "Desconocido"
+    # --- Lógica original COMENTADA TEMPORALMENTE para depuración ---
+    # level_query = await session.execute(
+    #     select(Level).filter_by(id=user.level_id)
+    # )
+    # level = level_query.scalars().first()
+    # level_name = level.name if level else "Desconocido"
+    #
+    # import json
+    # try:
+    #     user_badges = json.loads(user.badges_json) if user.badges_json else []
+    #     badges_list = ", ".join([badge['name'] for badge in user_badges]) if user_badges else "Ninguna"
+    # except json.JSONDecodeError:
+    #     badges_list = "Error al cargar insignias"
+    # --- FIN DE LÓGICA COMENTADA ---
 
-    # Formatear las insignias
-    import json # Importa json localmente si solo se usa en esta función
-    try:
-        user_badges = json.loads(user.badges_json) if user.badges_json else []
-        badges_list = ", ".join([badge['name'] for badge in user_badges]) if user_badges else "Ninguna"
-    except json.JSONDecodeError:
-        badges_list = "Error al cargar insignias" # En caso de que el JSON sea inválido
-
+    # Mensaje de prueba simple
     status_message = (
-        f"**Estado de {user.first_name}:**\n"
-        f"Nivel: **{level_name}** ({user.points} puntos)\n"
-        f"Insignias: {badges_list}\n"
-        f"Interacciones hoy: {user.interactions_count}\n"
-        f"Última interacción: {user.last_interaction_at.strftime('%Y-%m-%d %H:%M:%S') if user.last_interaction_at else 'N/A'}\n"
-        f"Últimos puntos diarios: {user.last_daily_points_claim.strftime('%Y-%m-%d %H:%M:%S') if user.last_daily_points_claim else 'Nunca'}\n"
-        f"Es Admin: {'Sí' if user.is_admin else 'No'}\n"
+        f"**¡Hola, {user.first_name}!**\n"
+        "Este es un mensaje de prueba para /status. ¡El comando funciona si ves esto!"
     )
     await message.answer(status_message)
 
@@ -93,7 +86,6 @@ async def cmd_admin_panel(message: types.Message, session: AsyncSession, user: U
     """
     Muestra el panel de administración si el usuario es un administrador.
     """
-    # Accede directamente a settings.ADMIN_IDS que se importa al inicio del archivo
     if user.id in settings.ADMIN_IDS:
         admin_message = (
             "Panel de Administración:\n\n"
