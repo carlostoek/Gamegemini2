@@ -1,4 +1,4 @@
-# middlewares/register_user.py
+# el_juego_del_divan/middlewares/register_user.py
 from typing import Callable, Dict, Any, Awaitable
 from aiogram import BaseMiddleware
 from aiogram.types import Message, CallbackQuery
@@ -34,8 +34,8 @@ class RegisterUserMiddleware(BaseMiddleware):
             # Inyecta la sesión en 'data' para que los handlers puedan acceder a ella
             data["session"] = session
 
-            user = await session.execute(select(User).filter_by(id=user_id))
-            db_user = user.scalars().first()
+            user_query = await session.execute(select(User).filter_by(id=user_id))
+            db_user = user_query.scalars().first()
 
             if not db_user:
                 db_user = User(
@@ -65,7 +65,7 @@ class RegisterUserMiddleware(BaseMiddleware):
                 # logger.debug(f"Usuario existente: {user_id} ({username})")
 
             # Añadir el objeto usuario de la base de datos a los datos que se pasan al handler
-            data["user"] = db_user # Asumo que tus handlers esperan 'user' como en cmd_status
+            data["user"] = db_user # Los handlers esperan 'user' como en cmd_status
 
             # Continuar con la ejecución del handler
             return await handler(event, data)
