@@ -1,59 +1,43 @@
-import asyncio
-import logging
 from aiogram import Bot, Dispatcher
-from aiogram.enums import ParseMode
-from aiogram.client.default import DefaultBotProperties
-from config.settings import settings
-from database.db import init_db, get_db, insert_initial_data
-from middlewares.db_middleware import DbSessionMiddleware
-from middlewares.user_middleware import UserMiddleware
-from scheduler.scheduler_config import setup_scheduler
-from utils.logger import logger
+from aiogram.fsm.storage.memory import MemoryStorage
+from config import Config
+from handlers.start import router as start_router
+from handlers.gamification import router as gamification_router
+from handlers.leaderboard import router as leaderboard_router
+from middlewares.auth import AuthMiddleware
+from utils.logger import Logger
 
-# Configuración básica de logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+async def start_bot():
+    logger = Logger.setup_logger()
+    logger.info("Initializing bot...")
+    
+    bot = Bot(token=Config.get_bot_token())
+    dp = Dispatcher(storage=MemoryStorage())
+    
+    # Registrar middleware
+    dp.message.middleware(AuthMiddleware())
+    dp.callback_query.middleware(AuthMiddleware())
+    
+    # Registrar handlers
+    dp.include_router(start_router)
+    dp.include_router(gamification_router)
+    dp.include_router(leaderboard_router)
+    
+    logger.info("Bot initialized successfully")
+    return bot, dp
 
-async def main() -> None:
-    """
-    Función principal que inicializa y arranca el bot de Telegram.
-    """
-    bot = Bot(token=settings.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN))
-    dp = Dispatcher()
-
-    # Inicializar la base de datos y asegurar que los niveles, insignias y recompensas iniciales estén presentes
-    await init_db()
-    async with get_db() as session:
-        await insert_initial_data(session)
-
-    # Middlewares: Se ejecutan antes de que los handlers procesen las actualizaciones.
-    dp.update.middleware(DbSessionMiddleware(session_pool=get_db))
-    dp.message.middleware(UserMiddleware(settings=settings))
-    dp.callback_query.middleware(UserMiddleware(settings=settings))
-
-    # Registrar routers: Agrupan los handlers de comandos y callbacks.
-    from handlers.users import user_commands
-    from handlers.interactions import callback_handlers
-    from handlers.admin import admin_commands
-    from handlers.users import redeem_commands
-
-    dp.include_router(user_commands.router)
-    dp.include_router(callback_handlers.router)
-    dp.include_router(admin_commands.router)
-    dp.include_router(redeem_commands.router)
-
-    # Configurar y arrancar el scheduler para tareas programadas (ej. puntos de permanencia)
-    await setup_scheduler(bot)
-
-    # Eliminar webhook existente (si lo hay) y empezar a procesar actualizaciones en modo polling
-    logger.info("Bot iniciando polling...")
-    await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
-    logger.info("Bot detenido.")
+async def main():
+    logger = Logger.setup_logger()
+    bot, dp = await start_bot()
+    try:
+        logger.info("Starting polling...")
+        await dp.start_polling(bot)
+    except Exception as e:
+        logger.error(f"Error during polling: {e}")
+    finally:
+        await bot.session.close()
+        logger.info("Bot session closed")
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Bot detenido manualmente por KeyboardInterrupt.")
-    except Exception as e:
-        logger.critical(f"Error fatal en el bot: {e}", exc_info=True)
+    import asyncio
+    asyncio.run(main())
