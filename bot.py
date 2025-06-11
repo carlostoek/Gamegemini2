@@ -22,10 +22,8 @@ async def main() -> None:
 
     # Inicializar la base de datos y asegurar que los niveles, insignias y recompensas iniciales estén presentes
     await init_db()
-    # ¡CAMBIO CRUCIAL AQUÍ! Usar async with para get_db()
-    async with get_db() as session: # <--- ¡CAMBIO AQUÍ!
+    async with get_db() as session:
         await insert_initial_data(session)
-        # Ya no necesitamos el `break` porque `async with` gestiona la sesión
 
     # Middlewares: Se ejecutan antes de que los handlers procesen las actualizaciones.
     dp.update.middleware(DbSessionMiddleware(session_pool=get_db))
