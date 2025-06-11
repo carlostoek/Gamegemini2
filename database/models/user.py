@@ -1,25 +1,25 @@
-# el_juego_del_divan/database/models/user.py
-from sqlalchemy import Column, BigInteger, String, Integer, Boolean, Text, DateTime
+# database/models/user.py
+from sqlalchemy import BigInteger, Column, String, Integer, DateTime, Boolean, DECIMAL
 from sqlalchemy.sql import func
-from database.base_model import Base # Importa Base desde base_model.py
+from database.base_model import Base # ¡Importación corregida!
 
 class User(Base):
-    __tablename__ = "users"
+    __tablename__ = 'users'
 
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger, primary_key=True, index=True) # ID de Telegram del usuario
     username = Column(String, nullable=True)
-    first_name = Column(String, nullable=False)
+    first_name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
     points = Column(Integer, default=0)
-    level_id = Column(Integer, default=1) # ID del nivel actual del usuario
-    badges_json = Column(Text, default="[]") # Almacena un JSON de insignias
+    level_id = Column(Integer, default=1) # Por defecto al Nivel 1
+    last_interaction_at = Column(DateTime, default=func.now())
+    interactions_count = Column(Integer, default=0) # Contador de interacciones diarias
+    last_daily_points_claim = Column(DateTime, nullable=True) # Ultima vez que reclamó puntos diarios (permanencia)
     is_admin = Column(Boolean, default=False)
-    # Campos para seguimiento de interacción y permanencia
-    join_date = Column(DateTime(timezone=True), default=func.now())
-    last_interaction_at = Column(DateTime(timezone=True), default=func.now())
-    interactions_count = Column(Integer, default=0) # Contador de interacciones diarias/periodo
-    last_daily_reset = Column(DateTime(timezone=True), default=func.now()) # Para el reseteo diario de interacciones/puntos
-    last_daily_points_claim = Column(DateTime(timezone=True), nullable=True) # Para control de puntos diarios
+    purchase_count = Column(Integer, default=0) # Contador de compras para bonus
+    join_date = Column(DateTime, default=func.now()) # Fecha de unión para hitos de permanencia
+    total_redeemed_rewards_value = Column(DECIMAL(10, 2), default=0.00) # Valor total de recompensas canjeadas
+    badges_json = Column(String, default="[]") # Guardará una lista JSON de insignias ganadas
 
     def __repr__(self):
-        return f"<User(id={self.id}, username='{self.username}', first_name='{self.first_name}')>"
+        return f"<User(id={self.id}, username='{self.username}', points={self.points})>"
