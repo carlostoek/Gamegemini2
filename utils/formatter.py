@@ -2,7 +2,7 @@
 from database.models.level import Level
 from database.models.user import User
 from database.models.badge import Badge
-from database.models.reward import Reward # Nueva importación
+from database.models.reward import Reward
 from typing import Optional, List
 
 def format_progress_bar(current_points: int, next_level_min_points: int, segment_length: int = 10) -> str:
@@ -15,7 +15,7 @@ def format_progress_bar(current_points: int, next_level_min_points: int, segment
     if segment_length <= 0:
         return ""
 
-    if next_level_min_points <= 0: # Evitar división por cero
+    if next_level_min_points <= 0:  # Evitar división por cero
         progress_percentage = 1.0
     else:
         progress_percentage = min(1.0, current_points / next_level_min_points)
@@ -26,10 +26,9 @@ def format_progress_bar(current_points: int, next_level_min_points: int, segment
     bar = "█" * filled_length + "░" * empty_length
     return f"[{bar}]"
 
-def format_user_status(user: User, current_level: Level, next_level: Optional[Level], points_to_next_level: int, user_badges: List[Badge]) -> str:
+def format_user_status(user: User, current_level: Level, next_level: Optional[Level], points_to_next_level: int, user_badges: List[dict]) -> str:
     """
-    Formatea el mensaje de estado del usuario para el comando /mispuntos.
-    Ahora incluye las insignias desbloqueadas.
+    Formatea el mensaje de estado del usuario para el comando /status.
     """
     username_display = f"@{user.username}" if user.username else user.first_name or "Usuario VIP"
     
@@ -40,8 +39,8 @@ def format_user_status(user: User, current_level: Level, next_level: Optional[Le
     )
 
     if next_level:
-        target_points_segment = next_level.min_points - current_level.min_points if current_level.min_points is not None else next_level.min_points
-        current_segment_points = user.points - current_level.min_points if current_level.min_points is not None else user.points
+        target_points_segment = next_level.points_required - current_level.points_required if current_level.points_required is not None else next_level.points_required
+        current_segment_points = user.points - current_level.points_required if current_level.points_required is not None else user.points
         
         progress_bar = format_progress_bar(current_segment_points, target_points_segment)
         
@@ -51,12 +50,12 @@ def format_user_status(user: User, current_level: Level, next_level: Optional[Le
         )
     else:
         status_message += (
-            f"🎉 ¡Has alcanzado el nivel máximo: **Leyenda Suprema**! 🎉\n\n"
+            f"🎉 ¡Has alcanzado el nivel máximo! 🎉\n\n"
         )
 
     status_message += "🏅 **Tus Insignias:**\n"
     if user_badges:
-        badges_list = [f"{badge.icon} {badge.name}" for badge in user_badges]
+        badges_list = [f"{badge.get('image_url', '🏅')} {badge['name']}" for badge in user_badges]
         status_message += "\n".join(badges_list) + "\n\n"
     else:
         status_message += "Aún no tienes insignias. ¡Sigue interactuando para desbloquearlas!\n\n"
@@ -72,6 +71,7 @@ def format_ranking_entry_anonymous(rank: int, user: User, level: Level, current_
     """
     if user.id == current_user_id:
         display_name = f"@{user.username}" if user.username else user.first_name or "Tú"
+        display_name += " (Tú)"
     else:
         # Anonimizar el nombre de usuario
         if user.username:
@@ -79,18 +79,29 @@ def format_ranking_entry_anonymous(rank: int, user: User, level: Level, current_
         elif user.first_name:
             display_name = f"{user.first_name[0]}****"
         else:
-            display_name = "Anónimo****" # Fallback si no hay ni username ni first_name
+            display_name = "Anónimo****"
 
-    return f"{rank}. **{display_name}** - `{user.points}` Pts ({level.name})"
+    # Emojis para los primeros lugares
+    rank_emoji = ""
+    if rank == 1:
+        rank_emoji = "🥇"
+    elif rank == 2:
+        rank_emoji = "🥈"
+    elif rank == 3:
+        rank_emoji = "🥉"
+    else:
+        rank_emoji = f"{rank}."
+
+    return f"{rank_emoji} **{display_name}** - `{user.points}` Pts ({level.name})"
 
 def format_reward_details(reward: Reward) -> str:
     """
     Formatea los detalles de una recompensa para el catálogo.
     """
-    stock_info = f"📦 Stock: {'Ilimitado' if reward.stock == -1 else reward.stock}"
+    stock_info = f"📦 **Stock:** {'Ilimitado' if reward.stock == -1 else reward.stock}"
     return (
-        f"**{reward.name}**\n"
-        f"  _Costo:_ `{reward.cost_points}` Puntos\n"
-        f"  _Descripción:_ {reward.description}\n"
-        f"  {stock_info}"
+        f"{reward.image_url or '🎁'} **{reward.name}**\n\n"
+        f"💰 **Costo:** `{reward.points_cost}` Puntos\n"
+        f"📝 **Descripción:** {reward.description}\n"
+        f"{stock_info}"
     )
